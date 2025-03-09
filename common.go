@@ -2,22 +2,23 @@ package main
 
 import (
 	"context"
+	"errors"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
 
 type WhereFunction func(db *gorm.DB) *gorm.DB
 
-type data struct {
-}
+type data struct{}
 
-func FindData(db *gorm.DB, ctx context.Context, model interface{}, cond WhereFunction) ([]*data, error) {
-	var d []*data
-	err := cond(DB(ctx)).Model(model).Find(&d).Error
-	if err != nil {
-		return nil, err
+var ErrDBForbiddenWithoutConstraints = errors.New("db forbidden using constraints not allowed")
+
+func CombineWheresDB(ctx context.Context, functions ...WhereFunction) *gorm.DB {
+	db := DB(ctx)
+	for _, fc := range functions {
+		db = fc(db)
 	}
-	return d, nil
+	return db
 }
 
 /**
@@ -108,4 +109,117 @@ func BatchSaveDataWithExcludeFields(ctx context.Context, value interface{}, colu
 		Columns:   columns,
 		UpdateAll: true,
 	}).Omit(excludeFields...).CreateInBatches(value, 100).Error
+}
+
+/**
+- 带有wheres的update，delete，一定要判断wheres条件是否为空，避免进行全表扫描
+- dbRes中会返回rowAffected字段，表示更新的条数，这个一般都要注意一下，是不是更新成功了
+*/
+
+// DeleteData 物理删除数据
+func DeleteData(ctx context.Context, value interface{}, wheres ...WhereFunction) (int64, error) {
+	if len(wheres) == 0 {
+		return 0, ErrDBForbiddenWithoutConstraints
+	}
+	dbRes := CombineWheresDB(ctx, wheres...).Model(value).Delete(value)
+	if dbRes.Error != nil {
+		return 0, dbRes.Error
+	}
+	return dbRes.RowsAffected, nil
+}
+
+/**
+- Update			❌ 只能更新一个字段	❌ 不忽略零值	只更新单个字段（不通用）
+- Updates (struct)	✅ 更新多个字段		✅ 忽略零值		适用于更新所有字段
+- Updates (map)		✅ 更新多个字段		❌ 不忽略零值	适用于部分字段更新
+*/
+
+// BatchUpdateData 更新模型所有字段（零值不更新）
+func BatchUpdateData(ctx context.Context, value interface{}, wheres ...WhereFunction) (int64, error) {
+	if len(wheres) == 0 {
+		return 0, ErrDBForbiddenWithoutConstraints
+	}
+	db := CombineWheresDB(ctx, wheres...).Model(value)
+	dbRes := db.Updates(value)
+	if dbRes.Error != nil {
+		return 0, dbRes.Error
+	}
+	return dbRes.RowsAffected, nil
+}
+
+/**
+- 更新部分字段，控制时可以使用 Select("字段名") 或 Omit("字段名") 。
+*/
+
+// UpdateData 更新模型部分字段（零值不更新）
+func UpdateData(ctx context.Context, value interface{}, include []string, exclude []string, wheres ...WhereFunction) (int64, error) {
+	if len(wheres) == 0 {
+		return 0, ErrDBForbiddenWithoutConstraints
+	}
+	db := CombineWheresDB(ctx, wheres...).Model(value)
+	if len(include) > 0 {
+		db = db.Select(include)
+	}
+	if len(exclude) > 0 {
+		db = db.Omit(exclude...)
+	}
+	dbRes := db.Updates(value)
+	if dbRes.Error != nil {
+		return 0, dbRes.Error
+	}
+	return dbRes.RowsAffected, nil
+}
+
+/**
+- 如果想更新零值的所有字段，可以使用Save，部分字段的话，我们可以使用UpdatesWithFields
+*/
+
+// UpdateDataWithFields 更新模型的部分字段（零值更新）
+func UpdateDataWithFields(ctx context.Context, model interface{}, updateFields map[string]interface{}, wheres ...WhereFunction) (int64, error) {
+	if len(wheres) == 0 {
+		return 0, ErrDBForbiddenWithoutConstraints
+	}
+	dbRes := CombineWheresDB(ctx, wheres...).Model(model).Updates(updateFields)
+	if dbRes.Error != nil {
+		return 0, dbRes.Error
+	}
+	return dbRes.RowsAffected, nil
+}
+
+func FindOne(ctx context.Context, value interface{}, wheres ...WhereFunction) (bool, error) {
+	if len(wheres) == 0 {
+		return false, ErrDBForbiddenWithoutConstraints
+	}
+	dbRes := CombineWheresDB(ctx, wheres...).Model(value).First(value)
+	if dbRes.Error != nil {
+		if errors.Is(dbRes.Error, gorm.ErrRecordNotFound) {
+			return false, nil
+		}
+		return false, dbRes.Error
+	}
+	return true, nil
+}
+
+func FindData(ctx context.Context, value interface{}, wheres ...WhereFunction) ([]*data, error) {
+	var d []*data
+	if len(wheres) == 0 {
+		return nil, ErrDBForbiddenWithoutConstraints
+	}
+	err := CombineWheresDB(ctx, wheres...).Model(value).Find(&d).Error
+	if err != nil {
+		return nil, err
+	}
+	return d, nil
+}
+
+func FindDataCount(ctx context.Context, value interface{}, wheres ...WhereFunction) (int64, error) {
+	var count int64
+	if len(wheres) == 0 {
+		return 0, ErrDBForbiddenWithoutConstraints
+	}
+	err := CombineWheresDB(ctx, wheres...).Model(value).Count(&count).Error
+	if err != nil {
+		return 0, err
+	}
+	return count, nil
 }
