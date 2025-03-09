@@ -1,0 +1,33 @@
+在声明model字段时，可以使用各种各样的标签支持一些特殊的功能
+
+1、column 指定列名
+2、serializer 将数据序列化/发序列化到数据库中的序列化器，例如 serializer:json/gob/unixtime
+3、size 定义列数据类型的大小和长度
+4、unique 定义列尾唯一键
+5、primaryKey 定义列为主键
+6、default 定义列的默认值
+7、precision 定义列的精度
+8、embedded 可以将数据结构嵌套，embeddedPrefix 潜入字段的列名前缀
+9、<- 标记写入权限（<-:create只创建，<-:update 只更新，<-:false无写入权限），-> 标记读取全限（->:false 无读权限）
+这种方式可以用于支持，不同系统对同一数据库表的操作权限隔离
+
+type Author struct {
+    ID int
+    Name string
+    Email string
+}
+
+type Blog struct {
+    ID int
+    Author Author `gorm:"embedded;embeddedPredix:author_"`
+    Info string
+}
+
+// 等效于
+type Blog struct {
+    ID int
+    AuthorID int
+    AuthorName string
+    AuthorEmail string
+    Info string
+}
