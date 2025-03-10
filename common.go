@@ -11,6 +11,7 @@ type WhereFunction func(db *gorm.DB) *gorm.DB
 
 type data struct{}
 
+// ErrDBForbiddenWithoutConstraints 为了避免全表扫描
 var ErrDBForbiddenWithoutConstraints = errors.New("db forbidden using constraints not allowed")
 
 func CombineWheresDB(ctx context.Context, functions ...WhereFunction) *gorm.DB {
@@ -27,7 +28,7 @@ Notice：
 */
 
 /**
-- 创建一条新的记录，适用于无脑插入，不存在刷数需求的场景下
+- 创建一条新的记录，适用于无脑插入，不存在insert的刷数需求的场景下
 - ID如果已经存在，如果自增会自动生成，否则会报错duplicateKey冲突
 - 批量插入的时候可以用crateInBatches提高性能
 */
@@ -69,7 +70,7 @@ func SaveDataWithFields(ctx context.Context, value interface{}, columnNames []st
 	return DB(ctx).Clauses(clause.OnConflict{
 		Columns:   columns,
 		DoUpdates: clause.AssignmentColumns(updateFields),
-		UpdateAll: len(updateFields) > 0,
+		UpdateAll: len(updateFields) == 0,
 	}).Create(value).Error
 }
 
@@ -88,7 +89,7 @@ func BatchSaveDataWithUpdateFields(ctx context.Context, value interface{}, colum
 	return DB(ctx).Clauses(clause.OnConflict{
 		Columns:   columns,
 		DoUpdates: clause.AssignmentColumns(updateFields),
-		UpdateAll: len(updateFields) > 0,
+		UpdateAll: len(updateFields) == 0,
 	}).CreateInBatches(value, 100).Error
 }
 
