@@ -316,6 +316,26 @@ func mergeKLists(lists []*ListNode) *ListNode {
 	return mergeTwoLists(mergeKLists(lists[:len(lists)/2]), mergeKLists(lists[len(lists)/2:]))
 }
 
+func sortList(head *ListNode) *ListNode {
+	if head == nil || head.Next == nil {
+		return head
+	}
+	dummy := &ListNode{
+		Val:  0,
+		Next: head,
+	}
+	slow, fast := dummy, dummy
+	for fast != nil && fast.Next != nil {
+		slow = slow.Next
+		fast = fast.Next.Next
+	}
+	mid := slow.Next
+	slow.Next = nil
+	leftList := sortList(head) //
+	rightList := sortList(mid) //
+	return mergeTwoLists(leftList, rightList)
+}
+
 func mergeTwoLists(list1 *ListNode, list2 *ListNode) *ListNode {
 	dummy := &ListNode{
 		Val:  0,
