@@ -362,3 +362,98 @@ func mergeTwoLists(list1 *ListNode, list2 *ListNode) *ListNode {
 	}
 	return dummy.Next
 }
+
+/**
+一个map（key，node），一个双向list（start， end）
+*/
+
+type LRUCache struct {
+	MP       map[int]*DNode
+	Capacity int
+	Head     *DNode
+	Tail     *DNode
+}
+
+type DNode struct {
+	Key   int
+	Value int
+	Next  *DNode
+	Pre   *DNode
+}
+
+func Constructor(capacity int) LRUCache {
+	dummy := &DNode{
+		Key:   -1,
+		Value: -1,
+	}
+
+	return LRUCache{
+		MP:       make(map[int]*DNode),
+		Capacity: capacity,
+		Head:     dummy,
+		Tail:     dummy,
+	}
+}
+
+func (this *LRUCache) Get(key int) int {
+	node, exist := this.MP[key]
+	if exist {
+		this.removeNode(node)
+		this.offerFirst(node)
+		return node.Value
+	}
+	return -1
+}
+
+func (this *LRUCache) Put(key int, value int) {
+	node, exist := this.MP[key]
+	if exist {
+		this.removeNode(node)
+		node.Value = value
+		this.MP[key] = node
+		this.offerFirst(node)
+		return
+	} else {
+		if len(this.MP) == this.Capacity {
+			// 容量已满，删除最后一个
+			delete(this.MP, this.Tail.Key)
+			this.removeNode(this.Tail)
+		}
+		// 放入新的节点
+		node = &DNode{
+			Key:   key,
+			Value: value,
+		}
+		this.MP[key] = node
+		this.offerFirst(node)
+	}
+}
+
+func (this *LRUCache) offerFirst(node *DNode) {
+	if this.Tail == this.Head {
+		this.Tail = node
+	}
+	head := this.Head
+	next := head.Next
+	head.Next = node
+	node.Pre = head
+	node.Next = next
+	if next != nil {
+		next.Pre = node
+	}
+}
+
+func (this *LRUCache) removeNode(node *DNode) {
+	if node == this.Tail {
+		this.Tail = this.Tail.Pre
+	}
+	pre := node.Pre
+	next := node.Next
+	pre.Next = next
+	if next != nil {
+		next.Pre = pre
+	}
+
+	// 清理指针（可选，便于GC）
+	node.Pre, node.Next = nil, nil
+}
