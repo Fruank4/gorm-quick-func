@@ -171,7 +171,7 @@ func isValidBSTCore(root *TreeNode) bool {
 var maxPathSumAns = math.MinInt32
 
 func maxPathSum(root *TreeNode) int {
-	maxPathSumAns = 0
+	maxPathSumAns = math.MinInt32
 	maxPathSumRecur(root)
 	return maxPathSumAns
 }
@@ -214,4 +214,103 @@ func rightSideView(root *TreeNode) []int {
 		}
 	}
 	return result
+}
+
+func lowestCommonAncestor(root, p, q *TreeNode) *TreeNode {
+	if root == nil {
+		return nil
+	}
+	if root == p || root == q {
+		return root
+	}
+
+	leftNode := lowestCommonAncestor(root.Left, p, q)
+	rightNode := lowestCommonAncestor(root.Right, p, q)
+	if (leftNode == p && rightNode == q) || (rightNode == p && leftNode == q) {
+		return root
+	}
+	if leftNode != nil {
+		return leftNode
+	}
+	if rightNode != nil {
+		return rightNode
+	}
+
+	return nil
+}
+
+var pre *TreeNode
+
+func flatten(root *TreeNode) {
+	pre = nil
+	flattenCore(root)
+}
+
+func flattenCore(root *TreeNode) {
+	pre = nil
+	if root == nil {
+		return
+	}
+	flattenCore(root.Right)
+	flattenCore(root.Left)
+	root.Left = nil
+	root.Right = pre
+	pre = root
+}
+
+var TargetSum int64
+var pathCountMap map[int64]int
+
+func pathSum(root *TreeNode, targetSum int) int {
+	TargetSum = int64(targetSum)
+	pathCountMap = make(map[int64]int)
+	result = 0
+	pathCountMap[0]++
+	dfs(root, 0)
+	return result
+}
+
+func dfs(root *TreeNode, val int64) {
+	if root == nil {
+		return
+	}
+	curVal := int64(root.Val) + val
+	needVal := curVal - TargetSum
+
+	result += pathCountMap[needVal]
+
+	pathCountMap[curVal]++
+	dfs(root.Left, curVal)
+	dfs(root.Right, curVal)
+	pathCountMap[curVal]--
+}
+
+/**
+preorder [3, 9,10, 20,15,7], inorder = [9,10, 3,15,20,7]
+*/
+
+var Pre []int
+var Ino []int
+
+func buildTree(preorder []int, inorder []int) *TreeNode {
+	Pre = preorder
+	Ino = inorder
+	return buildTreeCore(0, len(Pre)-1, 0, len(Ino)-1)
+}
+
+func buildTreeCore(preStart, preEnd, inStart, inEnd int) *TreeNode {
+	if preEnd < preStart || inEnd < inStart {
+		return nil
+	}
+	root := &TreeNode{
+		Val: Pre[preStart],
+	}
+	var i = inStart
+	for i < inEnd && Ino[i] != Pre[preStart] {
+		i++ //2
+	}
+
+	root.Left = buildTreeCore(preStart+1, preStart+i-inStart, inStart, i-1)
+	root.Right = buildTreeCore(preStart+i-inStart+1, preEnd, i+1, inEnd)
+	return root
 }
